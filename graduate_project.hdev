@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="20.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>dev_update_off ()</l>
+<l>dev_close_window()</l>
+<l>read_image(Image,'E:/halcon_data/原图片/b1.png')</l>
+<l>get_image_size (Image, Width, Height)</l>
+<l>dev_open_window (0, 0, Width/5, Height/5, 'black', WindowHandle)</l>
+<l>* dev_display (Image)</l>
+<l>rgb1_to_gray (Image, grayImage)</l>
+<c></c>
+<c>*进行局部局阈值分割</c>
+<l>mean_image (grayImage, ImageMean, 50, 50)</l>
+<l>dyn_threshold (grayImage, ImageMean, RegionDynThresh,10, 'not_equal')</l>
+<c>*创建圆形结构元素，用于闭运算</c>
+<l>gen_circle(StructElement, 5, 5, 10)</l>
+<c>*对图像中较亮的区域进行闭运算处理，填补各自轮廓中的小空隙</c>
+<l>closing(RegionDynThresh, StructElement, closeImage)</l>
+<c>*孔洞填充</c>
+<l>fill_up(closeImage, fillupImage)</l>
+<c>*开</c>
+<l>opening(fillupImage, StructElement, openImage)</l>
+<c></c>
+<c>*************选取快递单区域*************</c>
+<c>*分割开</c>
+<l>connection (openImage, ConnectedRegions)</l>
+<c>*按面积选取最大的区域</c>
+<l>select_shape_std (ConnectedRegions, SelectedRegion, 'max_area', 100)</l>
+<c></c>
+<c>*找外接矩形</c>
+<l>smallest_rectangle2 (SelectedRegion, Row16, Column16, Phi3, Length1, Length2)</l>
+<c>    </c>
+<c>*提取仿射最小外接矩形的四个顶点坐标</c>
+<l>gen_rectangle2_contour_xld (Rectangle4, Row16, Column16, Phi3, Length1, Length2)</l>
+<l>* tuple_cos (Phi3, Cos)</l>
+<l>* tuple_sin (Phi3, Sin)</l>
+<l>* dev_set_color('red')</l>
+<l>* a:= -Length1*Cos - Length2*Sin</l>
+<l>* b := -Length1*Sin + Length2*Cos</l>
+<l>* gen_cross_contour_xld(Cross, Row16-b,  Column16+a, 6, Phi3)</l>
+<l>* c := Length1*Cos - Length2*Sin</l>
+<l>* d := Length1*Sin + Length2*Cos</l>
+<l>* gen_cross_contour_xld(Cross, Row16-d, Column16+c, 6, Phi3)</l>
+<l>* e:= Length1*Cos + Length2*Sin</l>
+<l>* f := Length1*Sin - Length2*Cos</l>
+<l>* gen_cross_contour_xld(Cross, Row16-f, Column16+e, 6, Phi3)</l>
+<l>* g := -Length1*Cos + Length2*Sin</l>
+<l>* h := -Length1*Sin - Length2*Cos</l>
+<l>* gen_cross_contour_xld(Cross, Row16-h, Column16+g, 6, Phi3)</l>
+<c></c>
+<c>*xld转region</c>
+<l>gen_region_contour_xld (Rectangle4, RegionXLD, 'filled')</l>
+<c>*原图对比裁剪出快递单</c>
+<l>reduce_domain (Image, RegionXLD, ImageReduced)</l>
+<c>****************阈值分割提取码和字符****************</c>
+<c>*获取灰度值</c>
+<l>* get_grayval (ImageReduced, Row16, Column16, Grayval)</l>
+<l>* mult := 255/(Grayval[0]-Grayval[2])</l>
+<l>* add := -mult*Grayval[2]</l>
+<l>* scale_image (ImageReduced, ImageScaled, mult, add)</l>
+<l>* emphasize (ImageScaled, ImageEmphasize, Width, Height, 1)</l>
+<c></c>
+<l>regiongrowing(ImageReduced,Regions,3,3,6,100)</l>
+<l>*region_to_mean(Regions,Image,Disp)</l>
+<l>closing_circle (Regions, RegionClosing, 3.5)</l>
+<c></c>
+<l>connection(Regions, ConnectedRegions2)</l>
+<c>*传递前景区域，结果存储在元组中，元组中的值的索引对应于输入区域的索引</c>
+<l>area_center(ConnectedRegions2, Area, Row, Column)</l>
+<c>*对元组的元素进行排序并返回排序后的元组的索引</c>
+<l>tuple_sort_index(Area, Indices)</l>
+<c>*计算元组长度</c>
+<l>tuple_length(Area,Length)</l>
+<c>*取面积最大的几个区域删去</c>
+<l>area_tuple := []</l>
+<c></c>
+<l>for i := 1 to Length/20 by 1</l>
+<l>    area_tuple[i] := Indices[Length-i]+1</l>
+<l>endfor</l>
+<l>remove_obj (ConnectedRegions2, ObjectsReduced, area_tuple)</l>
+<l>*fill_up(ObjectsReduced, RegionFillUp2)</l>
+<l>closing_rectangle1(ObjectsReduced, closingRecRegion, 1, 4)</l>
+<l>* mean_image (ImageReduced, ImageMean2, 50, 50)</l>
+<l>* dyn_threshold (ImageReduced, ImageMean2, RegionDynThresh2,10, 'not_equal')</l>
+<l>* fast_threshold (ImageMean2, Region1, 0, 100, 20)</l>
+<l>* closing(RegionDynThresh2, StructElement, closeImage2)</l>
+<c>*分割开</c>
+<l>* connection (closeImage2, ConnectedRegions2)</l>
+<c>*孔洞填充</c>
+<l>* fill_up(closeImage2, fillupImage2)</l>
+<c></c>
+<c></c>
+<c>*条形码扫描</c>
+<l>* dev_close_window()</l>
+<l>* dev_open_window(0, 0, 512, 512, 'black', WindowHandle)</l>
+<l>* dev_set_draw ('margin')</l>
+<l>* dev_update_window ('off')</l>
+<l>* dev_set_line_width (2)</l>
+<c></c>
+<c>*创建条形码模型句柄。</c>
+<l>* create_bar_code_model ([], [], BarCodeHandle)</l>
+<c>*设置要查找的条码的最小宽度参数，也就是黑色和白色矩形 条沿着扫描方向的最小宽度</c>
+<l>* set_bar_code_param (BarCodeHandle, 'element_size_min', 1.5)</l>
+<c>*设置要查找条码的解码过程的中间结果是否保存，1是，0，否。</c>
+<l>* set_bar_code_param (BarCodeHandle, 'persistence', 1)</l>
+<c>*设置最少使用两条扫描线进行计算，结果相同才认为结果正确</c>
+<l>* set_bar_code_param (BarCodeHandle, 'min_identical_scanlines', 2)</l>
+<c>*设置扫码个数(设置为0，则扫描所有条码)</c>
+<l>* set_bar_code_param (BarCodeHandle, 'stop_after_result_num', 0)</l>
+<c></c>
+<c></c>
+<l>* get_image_size (ImageReduced, Width, Height)</l>
+<l>* dev_set_window_extents(0,0,Width, Height)</l>
+<l>* dev_display (ImageReduced)</l>
+<c>*在图片中开始查找条码，字符结果保存在DecodedDataStrings，条码区域保存在SymbolRegions</c>
+<c>*'auto'自动搜索条码类型</c>
+<l>* find_bar_code (ImageReduced, SymbolRegions, BarCodeHandle, 'auto', DecodedDataStrings)</l>
+<l>* if(|DecodedDataStrings|)</l>
+<l>*     CandidatesIds := [0:|DecodedDataStrings|-1]</l>
+<l>* else</l>
+<l>*     CandidatesIds := 'all'</l>
+<l>* endif</l>
+<l>* for Index := 0 to |DecodedDataStrings|-1 by 1</l>
+<c>    *获取条码计算的中间结果：条码区域</c>
+<l>*     get_bar_code_object(Candidates, BarCodeHandle, CandidatesIds[Index], 'candidate_regions')</l>
+<l>*     dev_set_color ('green')</l>
+<l>*     dev_display (Candidates)</l>
+<c>    *获取条码计算的中间结果：扫描线</c>
+<l>*     get_bar_code_object(ValidScanLines, BarCodeHandle, CandidatesIds[Index], 'scanlines_valid')</l>
+<l>*     dev_set_color ('yellow')</l>
+<l>*     dev_display (ValidScanLines)</l>
+<l>*     disp_message (WindowHandle, DecodedDataStrings[Index], 'window', 20*Index, 12, 'black', 'true')</l>
+<l>* endfor</l>
+<l>* clear_bar_code_model (BarCodeHandle)</l>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c>*求取区域的方向</c>
+<l>* orientation_region (RegionXLD, Phi)</l>
+<c>*求取区域的中心</c>
+<l>* area_center (RegionXLD, Area, Row, Column)</l>
+<c>*求取区域的角度，参数6：新的旋转之后的角度</c>
+<l>* vector_angle_to_rigid (Row, Column, Phi, Row, Column, rad(180), HomMat2D)</l>
+<l>* affine_trans_image (ImageReduced, ImageAffinTrans, HomMat2D, 'constant', 'false')</l>
+<c>*对区域旋转操作：转到水平</c>
+<l>* affine_trans_region (RegionXLD, RegionAffineTrans, HomMat2D, 'nearest_neighbor')</l>
+<c></c>
+<l>* dev_display (closeImage)</l>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>

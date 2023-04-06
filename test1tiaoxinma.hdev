@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="20.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<l>dev_update_off ()</l>
+<l>dev_close_window()</l>
+<l>read_image(Image,'E:/halcon_data/photo/tiaoxm1.png')</l>
+<c>*原图片/b3.png   11</c>
+<l>get_image_size (Image, Width, Height)</l>
+<l>dev_open_window (0, 0, Width, Height, 'black', WindowHandle)</l>
+<l>* dev_display (Image)</l>
+<l>rgb1_to_gray (Image, grayImage)</l>
+<c>*基于直方图的自适应阈值分割法</c>
+<l>gray_histo_range (Image, grayImage, 0, 255, 256, Histo, BinSize)</l>
+<l>create_funct_1d_array (Histo, Function)</l>
+<l>smooth_funct_1d_gauss (Function, 2, SmoothedFunction)</l>
+<l>derivate_funct_1d (SmoothedFunction, 'first', Derivative)</l>
+<l>zero_crossings_funct_1d (Derivative, ZeroCrossings)</l>
+<l>get_y_value_funct_1d (Derivative, ZeroCrossings, 'constant', Y)</l>
+<l>tuple_length (Y, Length)</l>
+<l>a := []</l>
+<l>j := 0</l>
+<l>c := ZeroCrossings[1]</l>
+<l>for i := 0 to Length-1 by 1</l>
+<l>    if (Y[i] &lt; 0) </l>
+<c>    *二阶导数小于0的点为极大值点</c>
+<l>        a[j] := ZeroCrossings[i]</l>
+<l>        j := j+1</l>
+<l>    endif</l>
+<l>endfor</l>
+<l>tuple_length (a, aLength)</l>
+<c>*直方图选第二个波峰 具体再调</c>
+<l>mingray := a[aLength-3]</l>
+<l>threshold (grayImage, Regions, mingray, 255)</l>
+<c>*中值滤波</c>
+<l>* median_image (grayImage, ImageMedian, 'square', 3, 'mirrored')</l>
+<c>*进行局部局阈值分割</c>
+<c>*20为分割亮暗区域的条件</c>
+<l>* dyn_threshold (grayImage, ImageMedian, RegionDynThresh, 20, 'not_equal')</l>
+<c>*创建圆形结构元素，用于闭运算</c>
+<l>gen_circle(StructElement, 5, 5, 10)</l>
+<c>*对图像中较亮的区域进行闭运算处理，填补各自轮廓中的小空隙</c>
+<l>closing(Regions, StructElement, closeImage)</l>
+<c>*孔洞填充</c>
+<l>fill_up(closeImage, fillupImage)</l>
+<c>*开</c>
+<l>opening(fillupImage, StructElement, openImage)</l>
+<c>*分割开</c>
+<l>connection (openImage, ConnectedRegions)</l>
+<c>*按面积选取最大的区域</c>
+<l>select_shape_std (ConnectedRegions, SelectedRegion, 'max_area', 100)</l>
+<c>*找外接矩形</c>
+<l>smallest_rectangle2 (SelectedRegion, Row16, Column16, Phi3, Length1, Length2)</l>
+<c>*提取仿射最小外接矩形的四个顶点坐标</c>
+<l>gen_rectangle2_contour_xld (Rectangle4, Row16, Column16, Phi3, Length1, Length2)</l>
+<c>*xld转region</c>
+<l>gen_region_contour_xld (Rectangle4, RegionXLD, 'filled')</l>
+<c>*原图对比裁剪出快递单</c>
+<l>reduce_domain (Image, RegionXLD, ImageReduced)</l>
+<c>*求取区域的方向</c>
+<l>orientation_region (RegionXLD, Phi)</l>
+<c>*求取区域的中心</c>
+<l>area_center (RegionXLD, Area, Row, Column)</l>
+<c>*求取区域的角度，参数6：新的旋转之后的角度</c>
+<l>vector_angle_to_rigid (Row, Column, Phi, Row, Column, -rad(90), HomMat2D)</l>
+<l>affine_trans_image (ImageReduced, ImageAffinTrans, HomMat2D, 'constant', 'true')</l>
+<c>*对区域旋转操作：转到水平</c>
+<l>affine_trans_region (RegionXLD, RegionAffineTrans, HomMat2D, 'nearest_neighbor')</l>
+<c>*原图对比裁剪出快递单</c>
+<l>reduce_domain (ImageAffinTrans, RegionAffineTrans, ImageReduced2)</l>
+<l>rgb1_to_gray (ImageReduced2, grayImage2)</l>
+<l>mean_image (grayImage2, ImageMean, 9, 9)</l>
+<c>****************阈值分割提取码和字符****************</c>
+<l>binary_threshold (ImageMean, Regionbi, 'max_separability', 'dark', UsedThreshold1)</l>
+<l>* regiongrowing(ImageMean,Regions2,3,3,6,100)</l>
+<l>* closing_circle (Regions2, RegionClosing, 3.5)</l>
+<l>* closing_rectangle1 (Regions2, RegionClosing, Width, Height)</l>
+<l>connection(Regionbi, ConnectedRegions2)</l>
+<c>*传递前景区域，结果存储在元组中，元组中的值的索引对应于输入区域的索引</c>
+<l>area_center(ConnectedRegions2, Area, Row, Column)</l>
+<c>*对元组的元素进行排序并返回排序后的元组的索引</c>
+<l>tuple_sort_index(Area, Indices)</l>
+<c>*计算元组长度</c>
+<l>tuple_length(Area,Length)</l>
+<c>*取面积最大的几个区域删去</c>
+<l>area_tuple := []</l>
+<l>area_tuple2 := []</l>
+<l>area_tuple3 := []</l>
+<l>for i := 1 to 1 by 1</l>
+<l>    area_tuple[i] := Indices[Length-i]+1</l>
+<l>endfor</l>
+<c>* 小</c>
+<l>for j := 0 to Length/2 by 1</l>
+<l>    area_tuple2[j] := Indices[j]+1</l>
+<l>endfor</l>
+<l>tuple_union (area_tuple, area_tuple2, Union)</l>
+<l>i := 0</l>
+<l>for k := 0 to Length-1 by 1</l>
+<l>    if (Area[k]&lt;450 or Area[k]&gt;500)</l>
+<l>        area_tuple3[i] := k</l>
+<l>        i := i+1</l>
+<l>    endif</l>
+<l>endfor</l>
+<l>remove_obj (ConnectedRegions2, ObjectsReduced, Union)</l>
+<l>closing_rectangle1(ObjectsReduced, closingRecRegion, 1, 4)</l>
+<c>*膨胀</c>
+<l>dilation_rectangle1 (closingRecRegion, RegionDilation, 45, 1)</l>
+<l>dilation_rectangle1 (RegionDilation, RegionDilation2, 1, 12)</l>
+<c>*？图片不同膨胀值不同</c>
+<l>union1 (RegionDilation2, RegionUnion)</l>
+<l>connection (RegionUnion, ConnectedRegions1)</l>
+<l>rectangularity (ConnectedRegions1, Rectangularity1)</l>
+<l>select_shape (ConnectedRegions1, SelectedRegions, 'rectangularity', 'and', 0.94, 1)</l>
+<l>select_shape (SelectedRegions, SelectedRegions1, 'area', 'and', 7000, 99999)</l>
+<l>gen_circle(StructElement2, 5, 5, 20)</l>
+<l>closing(SelectedRegions1, StructElement2, closeImage2)</l>
+<l>union1 (closeImage2, RegionUnion1)</l>
+<l>reduce_domain (ImageAffinTrans, RegionUnion1, oneImageReduced1)</l>
+<l>illuminate (oneImageReduced1, ImageIlluminate, Width, Height, 0.7)</l>
+<c>**************二维码********************</c>
+<l>binary_threshold (grayImage2, Regionbitemp, 'max_separability', 'dark', UsedThreshold1)</l>
+<l>difference (Regionbitemp, RegionUnion1, RegionDifference)</l>
+<l>gen_circle(StructElementQR, 1,1,3)</l>
+<l>closing (RegionDifference, StructElementQR, RegionClosingQR)</l>
+<l>connection (RegionClosingQR, ConnectedRegionsQR)</l>
+<l>rectangularity (ConnectedRegionsQR, Rectangularity2)</l>
+<l>select_shape (ConnectedRegionsQR, SelectedRegions2, 'rectangularity', 'and', 0.5, 1)</l>
+<l>select_shape_std (SelectedRegions2, SelectedRegionsQR, 'max_area', 70)</l>
+<l>gen_circle(StructElementQR2, 5,5,10)</l>
+<l>closing (SelectedRegionsQR, StructElementQR2, RegionClosingQR2)</l>
+<l>reduce_domain (ImageAffinTrans, RegionClosingQR2, ImageReducedQR)</l>
+<c></c>
+<c>********************一维码识别********************</c>
+<c>*创建条形码模型句柄。</c>
+<l>create_bar_code_model ([], [], BarCodeHandle)</l>
+<c>*设置要查找的条码的最小宽度参数，也就是黑色和白色矩形 条沿着扫描方向的最小宽度</c>
+<l>set_bar_code_param (BarCodeHandle, 'element_size_min', 1.5)</l>
+<c>*设置要查找条码的解码过程的中间结果是否保存，1是，0，否。</c>
+<l>set_bar_code_param (BarCodeHandle, 'persistence', 1)</l>
+<c>*设置最少使用两条扫描线进行计算，结果相同才认为结果正确</c>
+<l>set_bar_code_param (BarCodeHandle, 'min_identical_scanlines', 2)</l>
+<c>*设置扫码个数(设置为0，则扫描所有条码)</c>
+<l>set_bar_code_param (BarCodeHandle, 'stop_after_result_num', 0)</l>
+<l>find_bar_code (ImageIlluminate, SymbolRegions, BarCodeHandle, 'auto', DecodedDataStrings)</l>
+<l>if(|DecodedDataStrings|)</l>
+<l>    CandidatesIds := [0:|DecodedDataStrings|-1]</l>
+<l>else</l>
+<l>    CandidatesIds := 'all'</l>
+<l>endif</l>
+<l>for Index := 0 to |DecodedDataStrings|-1 by 1</l>
+<c>    *获取条码计算的中间结果：条码区域</c>
+<l>    get_bar_code_object(Candidates, BarCodeHandle, CandidatesIds[Index], 'candidate_regions')</l>
+<l>    dev_set_color ('green')</l>
+<l>    dev_display (Candidates)</l>
+<c>    *获取条码计算的中间结果：扫描线</c>
+<l>*     get_bar_code_object(ValidScanLines, BarCodeHandle, CandidatesIds[Index], 'scanlines_valid')</l>
+<l>*     dev_set_color ('yellow')</l>
+<l>*     dev_display (ValidScanLines)</l>
+<l>    disp_message (WindowHandle, DecodedDataStrings[Index], 'window', 20*Index, 12, 'black', 'true')</l>
+<l>endfor</l>
+<c></c>
+<c>********************?二维码识别********************</c>
+<l>create_data_code_2d_model ('QR Code', [], [], DataCodeHandle)</l>
+<l>set_data_code_2d_param (DataCodeHandle, 'polarity', 'light_on_dark')</l>
+<l>find_data_code_2d (ImageReducedQR, SymbolXLDs, DataCodeHandle,  'train', 'all', ResultHandles, DecodedDataStringsQR)</l>
+<l>disp_message (WindowHandle, '识别结果：'+DecodedDataStringsQR, 'window', 12, 12, 'black', 'true')</l>
+<l>clear_data_code_2d_model (DataCodeHandle)</l>
+<c></c>
+<c>********************快递三段码********************</c>
+<l>difference (RegionDifference, SelectedRegionsQR, RegionDifference2)</l>
+<l>connection (RegionDifference2, ConnectedRegions3)</l>
+<c>*有粘连</c>
+<l>* select_shape (ConnectedRegions3, SelectedRegions3, 'area', 'and', 1960, 1970)</l>
+<l>* select_shape_std (ConnectedRegions3, SelectedRegions3, 'max_area', 70)</l>
+<l>* gen_circle (StructElement3, 2, 2, 4)</l>
+<l>* opening (SelectedRegions3, StructElement3, RegionOpening)</l>
+<l>* erosion_circle (RegionOpening, RegionErosion, 3.5)</l>
+<l>* difference (RegionDifference2, RegionOpening, RegionDifference1)</l>
+<l>* connection (RegionDifference1, ConnectedRegions4)</l>
+<c>*根据长宽找三段码，外接矩形，原图裁剪</c>
+<l>select_shape (ConnectedRegions3, SelectedRegions3, 'width', 'and', 16, 23.1)</l>
+<l>select_shape (SelectedRegions3, SelectedRegionsThree, 'height', 'and', 33.9, 36.1)</l>
+<l>union1 (SelectedRegionsThree, RegionUnionThree)</l>
+<l>smallest_rectangle2 (RegionUnionThree, Row1, Column1, Phi1, Length11, Length21)</l>
+<l>gen_rectangle2_contour_xld (RectangleThree, Row1, Column1, Phi1, Length11+5, Length21+3)</l>
+<l>gen_region_contour_xld (RectangleThree, RegionThree, 'filled')</l>
+<l>reduce_domain (ImageAffinTrans, RegionThree, ImageReducedThree)</l>
+<l>binary_threshold (ImageReducedThree, RegionThreebi, 'max_separability', 'dark', UsedThreshold)</l>
+<l>gen_circle (StructElementThree, 1, 1, 2)</l>
+<l>closing (RegionThreebi, StructElementThree, RegionClosingThree)</l>
+<l>connection (RegionClosingThree, ConnectedRegionsThree)</l>
+<c>*识别 存在class</c>
+<l>read_ocr_class_mlp ('Industrial_0-9A-Z_NoRej.omc', OCRHandle)</l>
+<l>do_ocr_multi_class_mlp (ConnectedRegionsThree, ImageReducedThree, OCRHandle, Class, Confidence)</l>
+<l>*disp_message (WindowHandle, Class, 'window', 0, 0, 'blue', 'true')</l>
+<c>*每个字符下面显示并排序</c>
+<l>count_obj (ConnectedRegionsThree, Number)</l>
+<l>smallest_rectangle1 (ConnectedRegionsThree, Row11, Column11, Row2, Column2)</l>
+<l>for i:=1 to Number by 1</l>
+<l>    disp_message (WindowHandle, Class[i-1], 'ImageAffineTrans', Row2[i-1], Column11[i-1], 'blue', 'true')</l>
+<l>endfor</l>
+<l>tuple_sort_index (Column11, IndicesColumn11)</l>
+<l>threeduanma:=[]</l>
+<l>newColumn11 := subset(Column11, IndicesColumn11)</l>
+<l>a := IndicesColumn11[0]</l>
+<l>for j := 0 to Number-1 by 1</l>
+<l>    threeduanma[j] := Class[IndicesColumn11[j]]</l>
+<l>endfor</l>
+<c>********************收发件人信息********************</c>
+<l>select_shape (ConnectedRegions3, SelectedRegionsRStemp, 'width', 'and', 8.9, 9.1)</l>
+<l>select_shape (SelectedRegionsRStemp, SelectedRegionsRS1, 'height', 'and', 9.9, 11.1)</l>
+<l>dilation_rectangle1 (SelectedRegionsRS1, RegionDilationRS, 5, 1)</l>
+<l>union1 (RegionDilationRS, RegionUnionRS)</l>
+<l>connection (RegionUnionRS, ConnectedRegionsRS)</l>
+<l>select_shape_std (ConnectedRegionsRS, SelectedRegionsRS, 'max_area', 70)</l>
+<c></c>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>

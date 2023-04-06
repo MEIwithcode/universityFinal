@@ -1,0 +1,59 @@
+
+图像预处理
+https://blog.csdn.net/qq_38096703/article/details/106838281?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522167815809316800192280775%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=167815809316800192280775&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~top_positive~default-1-106838281-null-null.142^v73^insert_down4,201^v4^add_ask,239^v2^insert_chatgpt&utm_term=%E5%9B%BE%E5%83%8F%E9%A2%84%E5%A4%84%E7%90%86&spm=1018.2226.3001.4187
+
+
+阈值分割
+https://blog.csdn.net/weixin_42727896/article/details/118186511?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522167816710916800211528413%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=167816710916800211528413&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~sobaiduend~default-2-118186511-null-null.142^v73^insert_down4,201^v4^add_ask,239^v2^insert_chatgpt&utm_term=halcon%20%E9%98%88%E5%80%BC%E5%88%86%E5%89%B2&spm=1018.2226.3001.4187
+
+
+halcon中分割算子：
+（1）全局阈值分割：
+threshold(Image : Region : MinGray, MaxGray : )
+该算子适用于环境稳定，光照变化不大，目标与背景存在明显的灰度差的场合，根据灰度直方图确定阈值进行图像分割。
+
+read_image (Image, 'clip')
+gray_histo (Image, Image, AbsoluteHisto, RelativeHisto)
+gen_region_histo (Region, AbsoluteHisto, 255, 255, 1)
+*利用直方图获取阈值
+histo_to_thresh (AbsoluteHisto,10, MinThresh, MaxThresh)
+*全局阈值分割
+threshold (Image, Region1, MinThresh, MaxThresh)
+（2）自动全局阈值分割
+binary_threshold(Image : Region : Method, LightDark : UsedThreshold)
+该算子提供两种方法“max_separability”和“smooth_histo”。
+最大限度的可分性(max_separability)：根据“灰度直方图的阈值选择方法”的灰度直方图自动阈值调用。该算子首先计算图像的直方图，然后利用统计矩找到将像素分割为前景和背景的最优阈值，并最大化这两个类之间的可分性。此方法仅适用于byte和uint2图像。
+直方图平滑(smooth_histo)：首先确定灰度值的相对直方图。然后，从直方图提取相关的最小值，作为阈值操作的参数。为了减少最小值，直方图被平滑处理为一个高斯函数，就像在auto_threshold中一样。在平滑直方图中，掩模尺寸增大，直到得到2个波峰的最小值。然后，阈值设置为这个最小值的位置。
+
+read_image (Image, 'clip')
+binary_threshold (Image, Region, 'max_separability', 'dark', UsedThreshold)
+————————————————
+版权声明：本文为CSDN博主「火星wen」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/weixin_42727896/article/details/118186511
+
+阈值分割
+https://blog.csdn.net/qq_41234432/article/details/124369149?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522167817462816800226567618%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=167817462816800226567618&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~sobaiduend~default-2-124369149-null-null.142^v73^insert_down4,201^v4^add_ask,239^v2^insert_chatgpt&utm_term=%E5%B1%80%E9%83%A8%E9%98%88%E5%80%BC%E5%88%86%E5%89%B2&spm=1018.2226.3001.4187
+
+四邻域标记算法：
+1）   判断此点四邻域中的最左，最上有没有点，如果都没有点，则表示一个新的区域的开始。
+
+2）   如果此点四邻域中的最左有点，最上没有点，则标记此点为最左点的值；如果此点四邻域中的最左没有点，最上有点，则标记此点为最上点的值。
+
+3）   如果此点四邻域中的最左有点，最上都有点，则标记此点为这两个中的最小的标记点，并修改大标记为小标记。
+
+2、  八邻域标记算法：
+1）   判断此点八邻域中的最左，左上，最上，上右点的情况。 如果都没有点，则表示一个新的区域的开始。
+
+2）   如果此点八邻域中的最左有点，上右都有点，则标记此点为这两个中的最小的标记点，并修改大标记为小标记。
+
+3）   如果此点八邻域中的左上有点，上右都有点，则标记此点为这两个中的最小的标记点，并修改大标记为小标记。
+
+4）   否则按照最左，左上，最上，上右的顺序，标记此点为四个中的一个。
+
+注意：在这个过程中也可以求出每个不同标记点的数量，矩形区域。
+————————————————
+版权声明：本文为CSDN博主「byxdaz」的原创文章，遵循CC 4.0 BY-SA版权协议，转载请附上原文出处链接及本声明。
+原文链接：https://blog.csdn.net/byxdaz/article/details/664545
+
+数据集
+https://blog.csdn.net/jhsignal/article/details/107930105
