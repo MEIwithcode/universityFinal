@@ -1,1 +1,5 @@
-123
+ 切换分支git checkout master
+git init
+git add .
+git commit -m "XXXX"
+git push
