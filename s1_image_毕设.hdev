@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hdevelop file_version="1.2" halcon_version="20.05.0.0">
+<procedure name="main">
+<interface/>
+<body>
+<c>** </c>
+<c>* 实例1</c>
+<l>dev_update_off()</l>
+<l>*read_image (Image, '毕设/标签.png')</l>
+<l>* read_image (Image, '毕设/b12.png')</l>
+<l>* rgb1_to_gray (Image, GrayImage)</l>
+<l>*  list_files('D:/HALCONfile/快递表单png' ,['files','follow_links'],ImageFiles)</l>
+<l>*     list_files('D:/HALCONfile/原图片' ,['files','follow_links'],ImageFiles)</l>
+<l>*     list_files('D:/HALCONfile/噪声图片' ,['files','follow_links'],ImageFiles)</l>
+<l>*     tuple_regexp_select(ImageFiles,['\\.png','ignore_case'],ImageFiles)</l>
+<l>*     ImageNum:=|ImageFiles|</l>
+<l>*     for imgIndex :=0 to ImageNum-1 by 1</l>
+<l>*         read_image(Image, ImageFiles[imgIndex])</l>
+<c>        *************</c>
+<l>        read_image(Image,'E:/halcon_data/tiaoxm1.png')</l>
+<c>       *获取图片大小</c>
+<l>        get_image_size(Image, Width, Height)</l>
+<c>       *关窗口</c>
+<l>        dev_close_window()</l>
+<c>        *开窗口</c>
+<l>        dev_open_window_fit_size(0, 0, Height, Height, -1, -1, WindowHandle)</l>
+<c>        *显示图片</c>
+<l>*         dev_display(Image)</l>
+<c>        *图像灰度化/获取单通道图像</c>
+<l>        access_channel(Image, GrayImage, 2)</l>
+<c></c>
+<l>*create_bar_code_model([], [], BarCodeHandle)</l>
+<l>*find_bar_code(GrayImage, SymbolRegions, BarCodeHandle, 'auto', DecodedDataStrings)</l>
+<l>*create_data_code_2d_model( 'QR Code', [], [], DataCodeHandle)</l>
+<l>*find_data_code_2d(GrayImage, SymbolXLDs, DataCodeHandle, [], [], ResultHandles, DecodedDataStrings1)</l>
+<c></c>
+<l>mean_image(GrayImage, ImageMean, 500, 500)</l>
+<l>dyn_threshold(GrayImage, ImageMean, RegionDynThresh, 10, 'light')</l>
+<c>* 填充空隙</c>
+<l>closing_circle (RegionDynThresh, RegionClosing, 8.5)</l>
+<c>* 填充孔洞，区域数量不变</c>
+<l>fill_up (RegionClosing, RegionFillUp)</l>
+<c>* 去除毛刺</c>
+<l>opening_circle (RegionFillUp, RegionOpening, 100)</l>
+<l>* dilation_rectangle1(RegionDynThresh, RegionDilation1, 20, 20)</l>
+<c>* 分离非联通区域</c>
+<l>connection (RegionOpening, ConnectedRegions)</l>
+<c>* 按照面积选区域</c>
+<l>select_shape_std(ConnectedRegions, electedRegions, 'max_area', 90)</l>
+<l>gen_contour_region_xld (electedRegions, Contours, 'border')</l>
+<l>fit_rectangle2_contour_xld(Contours, 'tukey', -1, 0, 0, 3, 2, Row_fit, Column_fit, Phi_fit, \
+                           Length1_fit, Length2_fit, PointOrder_fit)</l>
+<l>shape_trans(electedRegions,RegionTrans1,'rectangle2')</l>
+<l>smallest_rectangle2(RegionTrans1, Row, Column, Phi, Length1, Length2)</l>
+<l>* gen_rectangle2(Rectangle, Row_fit, Column_fit, Phi_fit, Length1_fit, Length2_fit)</l>
+<l>* dev_display(Rectangle)</l>
+<c></c>
+<l>reduce_domain (GrayImage, RegionTrans1, ImageReduced)</l>
+<l>crop_domain(ImageReduced, ImagePart)</l>
+<l>* dev_display(ImagePart)</l>
+<c>******************几何校正**********</c>
+<l>PI := 3.14159</l>
+<c>*创建一个空的旋转矩阵</c>
+<l>hom_mat2d_identity(HomMat2DIdentity)</l>
+<c>*为旋转矩阵赋值</c>
+<l>if(Phi_fit&gt;0.05)</l>
+<l>    hom_mat2d_rotate(HomMat2DIdentity, PI*0.5-Phi_fit, Row_fit, Column_fit, HomMat2DRotate)</l>
+<l>elseif(Phi_fit&lt;-0.05)</l>
+<l>    hom_mat2d_rotate(HomMat2DIdentity, PI*1.5-Phi_fit, Row_fit, Column_fit, HomMat2DRotate)</l>
+<l>else</l>
+<l>    hom_mat2d_rotate(HomMat2DIdentity, 0, Row_fit, Column_fit, HomMat2DRotate) </l>
+<l>endif</l>
+<c>*实现旋转</c>
+<l>affine_trans_image(ImageReduced, ImageAffineTrans, HomMat2DRotate, 'constant', 'false')</l>
+<l>affine_trans_region(RegionTrans1, RegionAffineTrans, HomMat2DRotate, 'nearest_neighbor')</l>
+<l>affine_trans_contour_xld(Contours, ContoursAffineTrans, HomMat2DRotate)</l>
+<l>reduce_domain(ImageAffineTrans, RegionAffineTrans, ImageAffineReduced)</l>
+<l>crop_domain(ImageAffineReduced, ImageAffinePart)</l>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c>********************</c>
+<c>********************** 提取条形码**************************************************</c>
+<l>mean_image(ImageAffinePart, ImageMean1, 300, 300)</l>
+<l>dyn_threshold(ImageAffinePart, ImageMean1, Region_Bin, 10, 'dark')  //尝试10</l>
+<l>dev_display(Region_Bin)</l>
+<c></c>
+<l>connection (Region_Bin, ConnectedRegions_2)</l>
+<l>shape_trans(ConnectedRegions_2, RegionTrans, 'convex')</l>
+<c></c>
+<l>select_shape(RegionTrans, SelectedRect, ['rectangularity', 'anisometry', 'area'], 'and', \
+             [0.35, 5, 100], [1, 50, 100000])</l>
+<c></c>
+<l>get_image_size(ImageAffinePart, Width, Height)</l>
+<l>region_features(SelectedRect, 'area', Area_bar)</l>
+<l>smallest_rectangle2(SelectedRect, Row_bar, Column_bar, Phi_bar, Length1_bar, Length2_bar)</l>
+<l>tuple_sort(Area_bar, AreaSorted)</l>
+<l>tuple_sort(Phi_bar, PhiSorted)</l>
+<l>tuple_sort(Length1_bar, Length1Sorted)</l>
+<l>LeftIndex := int(|PhiSorted|/4)</l>
+<l>RightIndex := int(|PhiSorted|*3/4)</l>
+<l>tuple_select_range(AreaSorted, LeftIndex, RightIndex, AreaSelected)</l>
+<l>tuple_select_range(PhiSorted, LeftIndex, RightIndex, PhiSelected)</l>
+<l>tuple_select_range(Length1Sorted, LeftIndex, RightIndex, Length1Selected)</l>
+<l>Area_ave := mean(AreaSelected)</l>
+<l>Phi_ave := mean(PhiSelected)</l>
+<l>Length1_ave := mean(Length1Selected)</l>
+<c></c>
+<l>select_shape(SelectedRect, SelectedRect1, ['area', 'rect2_len1', 'column', 'row'], 'and', [Area_ave*0.3, \
+       Length1_ave*0.8, Width*0.05, Height*0.05], [Area_ave*5, Length1_ave*1.5, Width*0.95, Height*0.95])</l>
+<c></c>
+<l>union1(SelectedRect1, RegionUni)</l>
+<l>dilation_circle (RegionUni, RegionDilation, 15)</l>
+<l>opening_circle (RegionDilation, RegionOpening1, 20)</l>
+<l>connection(RegionOpening1, ConnectedReg)</l>
+<l>region_features(ConnectedReg, 'area', Area_Selbar)</l>
+<l>Area_min := mean(Area_Selbar)*0.8</l>
+<l>Area_max := max(Area_Selbar)</l>
+<l>select_shape(ConnectedReg, SelectedReg, ['area'], 'and', [Area_min], [Area_max])</l>
+<l>reduce_domain(ImageAffinePart,SelectedReg, ImageReduced1)</l>
+<l>smallest_rectangle2(SelectedReg, Row_Recfit, Col_Recfit, Phi_Recfit, Len1_Recfit,\
+                    Len2_Recfit)</l>
+<c></c>
+<l>create_bar_code_model([], [], BarCodeHandle)</l>
+<l>DecodedBar := []</l>
+<l>for num:=0 to |Row_Recfit|-1 by 1</l>
+<l>    gen_rectangle2(Rect_BarReg, Row_Recfit[num], Col_Recfit[num], Phi_Recfit[num], \
+                   Len1_Recfit[num], Len2_Recfit[num]) </l>
+<l>    reduce_domain (ImageAffinePart, Rect_BarReg, ImageReduced2)    </l>
+<l>    decode_bar_code_rectangle2(ImageReduced2, BarCodeHandle, 'auto', Row_Recfit[num], Col_Recfit[num], Phi_Recfit[num], \
+                   Len1_Recfit[num]*1.1, Len2_Recfit[num]*1.1, DecodedDataStrings)</l>
+<l>    DecodedBar := [DecodedBar, DecodedDataStrings]</l>
+<l>endfor</l>
+<c></c>
+<c>**********************************************************************</c>
+<c>* 提取二维码</c>
+<l>complement(RegionOpening1, SelectedRegComp)</l>
+<l>reduce_domain(ImageAffinePart, SelectedRegComp, ImageRedu) </l>
+<l>mean_image(ImageRedu, ImageMean2, 100, 100)</l>
+<l>dyn_threshold(ImageRedu, ImageMean2, Region_QR, 40, 'dark')  </l>
+<c></c>
+<l>erosion_circle(Region_QR, ImageReduQR, 2)</l>
+<l>closing_circle(ImageReduQR, RegionClosQR, 8)</l>
+<l>fill_up(RegionClosQR, ImageFillQR)</l>
+<l>connection(ImageFillQR, ConnectedQR)</l>
+<c></c>
+<l>select_shape(ConnectedQR, SelRegionsQR, ['anisometry','column', 'row'], 'and', \
+             [0.7, Width*0.1, Height*0.1], [1.3, Width*0.9, Height*0.9])</l>
+<l>select_shape_std(SelRegionsQR, SeleStdRegions, ['max_area'], [90])</l>
+<c></c>
+<l>erosion_circle(SeleStdRegions, SeleStdRegQR2, 8)</l>
+<l>shape_trans(SeleStdRegQR2, RegionQRTrans, 'convex')</l>
+<c></c>
+<l>smallest_rectangle2(RegionQRTrans,RowQR, ColumnQR, PhiQR, Length1QR, Length2QR)</l>
+<l>gen_rectangle2(RectReg_QR, RowQR, ColumnQR, PhiQR, Length1QR*1.1, Length2QR*1.1)</l>
+<l>reduce_domain(ImageAffinePart, RectReg_QR, ImageRedQR)</l>
+<c></c>
+<l>create_data_code_2d_model( 'QR Code', [], [], DataCodeHandle)</l>
+<l>find_data_code_2d(ImageRedQR, SymbolXLDs, DataCodeHandle, [], [], ResultHandles,\
+                  DecodedStringQR)</l>
+<l>dev_display(ImageAffinePart)</l>
+<l>dev_display(ImageReduced2)</l>
+<l>dev_display(ImageRedQR)</l>
+<l>dev_disp_text(DecodedDataStrings,'window',40,20,'black',[], [])</l>
+<l>dev_disp_text(DecodedStringQR,'window',80,20,'black', [], [])</l>
+<c></c>
+<l>stop()</l>
+<l>*     endfor</l>
+<c>********************************************************************</c>
+<c>* 实例2</c>
+<l>* dev_update_off()</l>
+<l>* read_image (ImageT, '毕设/ImageTemp.png')</l>
+<l>* create_scaled_shape_model(ImageT, 10, rad(0), rad(360), 'auto', 0.6, 1.8,\
+                       'auto', 'auto', 'use_polarity', 40, 20, ModelID)</l>
+<l>* get_shape_model_contours(ModelContours, ModelID, 1)</l>
+<c></c>
+<l>* for index := 0 to 9 by 1</l>
+<l>*    read_image (ImageSearch, '毕设/标签.png')</l>
+<l>*     read_image (ImageSearch, '毕设/b'+index$'0'+'.png')</l>
+<l>*     rgb1_to_gray(ImageSearch, ImageSearch)</l>
+<l>*     get_image_size(ImageSearch, Width, Height)</l>
+<l>*     dev_display(ImageSearch)</l>
+<l>*     area_center_gray(ImageSearch, ImageSearch, Area, RowGray, ColumnGray)   </l>
+<c>    * 在目标图像中寻找模板图像</c>
+<l>*     find_scaled_shape_model(ImageSearch, ModelID, rad(0), rad(360), 0.6, 1.8, 0.5, \
+                  1, 0.5, 'least_squares', 0, 0.8, Row, Column, Angle, Scale, Score)</l>
+<l>*     if(|Score|&gt;0)</l>
+<c>        * 方法1：直接采用算子进行显示</c>
+<l>*         dev_display_shape_matching_results (ModelID, 'red', Row, Column, Angle, Scale, Scale, 0)</l>
+<c>        </c>
+<c>        </c>
+<l>*         hom_mat2d_identity(HomMat2DIdentity)</l>
+<l>*         hom_mat2d_rotate(HomMat2DIdentity, -Angle, Width/2, Height/2, HomMat2DRotate)</l>
+<l>*         affine_trans_image(ImageSearch, ImageAffineTrans, HomMat2DRotate, 'constant', 'true') </l>
+<l>*         stop()</l>
+<l>*         dev_clear_window()</l>
+<l>*         dev_display(ImageAffineTrans)</l>
+<l>*     endif</l>
+<l>    *disp_continue_message(WindowHandle, 'black', 'true')</l>
+<l>*     stop()    </l>
+<c>    </c>
+<l>* endfor</l>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+<c></c>
+</body>
+<docu id="main">
+<parameters/>
+</docu>
+</procedure>
+</hdevelop>
